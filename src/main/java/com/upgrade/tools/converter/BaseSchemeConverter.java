@@ -17,29 +17,29 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * @author Albert Gomes Cabral
  */
 public abstract class BaseSchemeConverter implements SchemeConverter {
 
-    protected abstract Pattern[] getContextPattern();
+    protected abstract Pattern getContextPattern();
 
     protected abstract String getDatabaseType();
 
     protected String beforeProcess(
-        String content, String sourceStatement) {
+        String content, String sourceStatement, List<String> keys) {
 
         return content;
     }
 
     protected List<String> postProcess(
-        List<String> contents, String sourceContent, List<String> indexesName) {
+        List<String> contents, String sourceContent, List<String> keys) {
 
         return contents;
     }
@@ -47,7 +47,7 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
     @Override
     public void converter(
             String path, String sourceName, String targetName, String newName,
-            List<String> indexesName)
+            List<String> keys)
         throws ConverterException {
 
         try {
@@ -66,16 +66,14 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
                 new ArrayList<>(targetContentChunks.size());
 
             for (String targetContent : targetContentChunks) {
-                for (Pattern pattern : getContextPattern()) {
-                    targetContent = _converterContextPattern(
-                        sourceContent, targetContent, pattern);
+                targetContent = _converterContextPattern(
+                    sourceContent, targetContent, getContextPattern(), keys);
 
-                    resultTargetContentChunks.add(targetContent);
-                }
+                resultTargetContentChunks.add(targetContent);
             }
 
             _writerResult(
-                postProcess(resultTargetContentChunks, sourceContent, indexesName),
+                postProcess(resultTargetContentChunks, sourceContent, keys),
                 path, newName);
         }
         catch (Exception exception) {
@@ -94,9 +92,10 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
     }
 
     private String _converterContextPattern(
-        String sourceContent, String targetContent, Pattern pattern) {
+        String sourceContent, String targetContent, Pattern pattern, List<String> keys) {
 
         Matcher matcherTarget = pattern.matcher(targetContent);
+        StringBuilder sb = new StringBuilder();
 
         while (matcherTarget.find()) {
             Matcher matcherSource = pattern.matcher(sourceContent);
@@ -108,29 +107,39 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
                 if (tableNameSource.equalsIgnoreCase(tableNameTarget)) {
                     Print.info(String.format("Converting %s table", tableNameSource));
 
-                    targetContent = targetContent.replaceAll(
-                        tableNameTarget, tableNameSource);
-
                     String columnsSource = matcherSource.group(2);
                     String columnsTarget = matcherTarget.group(2);
 
                     String convertedColumns = _getConvertedColumns(
                         columnsSource, columnsTarget);
 
-                    targetContent = targetContent.replace(
-                        columnsTarget, beforeProcess(convertedColumns, sourceContent));
+                    convertedColumns = beforeProcess(
+                            convertedColumns, columnsSource, keys);
+
+                    matcherTarget.appendReplacement(
+                        sb,
+                        Matcher.quoteReplacement(
+                            matcherTarget.group(0)
+                                .replace(columnsTarget, convertedColumns)
+                                .replace(tableNameTarget, tableNameSource)
+                        ));
+
+                    Print.replacement(columnsTarget, convertedColumns, pattern);
+                    break;
                 }
             }
         }
 
-        return targetContent;
+        matcherTarget.appendTail(sb);
+
+        return sb.toString();
     }
 
     private String _extractColumnName(String column) {
         Pattern pattern = Pattern.compile("^`?\\w+`?");
 
         String normalizeColumn = column.replaceAll(
-            "\"", "");
+            "\"", "").replaceAll("`", "");
 
         Matcher matcher = pattern.matcher(normalizeColumn);
 
@@ -183,6 +192,15 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         Set<String> columns = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
         for (String column : columnContent.split(",\\n")) {
+            if (column.trim().toUpperCase().startsWith("PRIMARY") ||
+                    column.trim().toUpperCase().startsWith("UNIQUE")  ||
+                    column.trim().toUpperCase().startsWith("FOREIGN") ||
+                    column.trim().toUpperCase().startsWith("KEY")     ||
+                    column.trim().toUpperCase().startsWith("CONSTRAINT")) {
+
+                continue;
+            }
+
             Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
 
             if (matcher.find()) {
@@ -200,23 +218,25 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         Set<String> newColumns = new HashSet<>(sourceColumnsSet);
 
         targetColumnsSet.forEach(
-            (column) -> {
-                Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
+                (column) -> {
+                    Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
 
-                if (matcher.find()) {
-                    String columnTargetNormalized = matcher.group(1).replaceAll(
-                        "\"", "").toLowerCase();
+                    if (matcher.find()) {
+                        String columnTargetNormalized = matcher.group(1)
+                            .replaceAll("\"", "")
+                            .replaceAll("`", "")
+                            .toLowerCase();
 
-                    Set<String> collected = sourceColumnsSet.stream()
-                        .map(this::_extractColumnName)
-                        .filter(columnTargetNormalized::equalsIgnoreCase)
-                        .collect(Collectors.toSet());
+                        boolean exists = sourceColumnsSet.stream()
+                            .map(this::_extractColumnName)
+                            .filter(Objects::nonNull)
+                            .anyMatch(name -> name.equalsIgnoreCase(columnTargetNormalized));
 
-                    if (collected.contains(columnTargetNormalized)) return;
+                        if (exists) return;
 
-                    newColumns.add(column);
+                        newColumns.add(column);
+                    }
                 }
-            }
         );
 
         return newColumns;
@@ -234,7 +254,7 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
 
         contentMap.put(
             "target.content",
-            SchemeConverterUtil.readChunks(target, 120000, Integer.MAX_VALUE));
+            SchemeConverterUtil.readChunksSafe(target, 120000));
 
         return contentMap;
     }
@@ -269,9 +289,7 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
 
         File file = new File(path + newName);
 
-        try (BufferedWriter writer =
-                     new BufferedWriter(new FileWriter(file))) {
-
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
             for (String content : contents) {
                 writer.write(content);
             }
