@@ -14,8 +14,8 @@ import java.util.regex.Pattern;
 public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
 
     @Override
-    protected Pattern[] getContextPattern() {
-        return new Pattern[] {_TABLE_NAME_PATTERN};
+    protected Pattern getContextPattern() {
+        return _TABLE_NAME_PATTERN;
     }
 
     @Override
@@ -24,17 +24,20 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
     }
 
     @Override
-    protected List<String> postProcess(List<String> contents, String sourceContent, List<String> indexesName) {
+    protected List<String> postProcess(
+        List<String> contents, String sourceContent, List<String> indexesName) {
+
         return _postProcess(contents, sourceContent, indexesName);
     }
 
     private List<String> _postProcess(
-            List<String> targetStatements, String sourceStatement, List<String> indexesName) {
+        List<String> targetStatements, String sourceStatement, List<String> indexesName) {
 
         List<String> resultStatements = _attributesTransform(targetStatements);
 
         resultStatements.add(
-            _addIndexesRulesAndAlterTable(targetStatements.getLast(), sourceStatement, indexesName));
+            _addIndexesRulesAndAlterTable(
+                targetStatements.getLast(), sourceStatement, indexesName));
 
         return resultStatements;
     }
@@ -44,7 +47,7 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
 
         Pattern alterTableOnly = Pattern.compile(
             "ALTER TABLE ONLY\\s+public\\.(?!\\w+_x_\\d+)\\w+\\s+" +
-                    "ADD CONSTRAINT\\s+.*?PRIMARY KEY\\s*\\(.*?\\);\n");
+                "ADD CONSTRAINT\\s+.*?PRIMARY KEY\\s*\\(.*?\\);\n");
 
         Matcher alterTableOnlyMatcher = alterTableOnly.matcher(sourceStatement);
 
