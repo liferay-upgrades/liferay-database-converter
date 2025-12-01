@@ -63,27 +63,43 @@
 
 6. After starting the portal, go to the Docker container and extract a dump file:
    -  Go to Docker container:
+   
     ```
     docker compose exec mysql|postgresql bash
     ```
+    
     - Run the following command to generate a dump
        
     MySQL:
+    
     ```
-    mysqldump -u [CUSTOMER_USER_NAME] -p[CUSTOMER_PASSWORD] [CUSTOMER_SCHEME_NAME] > [file-name-dump-with-timestamp.sql]
+    mysqldump -u [CUSTOMER_USER_NAME] -p[CUSTOMER_PASSWORD] --no-data [CUSTOMER_SCHEMA_NAME] > output_schema.sql
     ```
-    PostgreSQL:
-    ```
-    pg_dump -U [CUSTOMER_USER_NAME] -d [CUSTOMER_SCHEME_NAME] -f [file-name-dump-with-timestamp.sql]
-    ```  
 
-    - Copy the dump out from the container:
+    ```
+    mysqldump -u [CUSTOMER_USER_NAME] -p[CUSTOMER_PASSWORD] --no-create-info [CUSTOMER_SCHEMA_NAME] > output_data.sql
+    ```
+    
+    PostgreSQL:
+
+    ```
+    pg_dump -U postgres -d [DATABASE_NAME] --schema-only > output_schema.sql
+    ```
+
+    ```
+    pg_dump -U postgres -d [DATABASE_NAME] --data-only > output_data.sql
+    ```
+    
+
+- Copy the dump out from the container:
 
     ```
     docker compose cp mysql|postgres:/[file-name-dump-with-timestamp.sql] [destination folder]
     ```
+Separating schema and data ensures that only the structural part is processed by the tool while preserving the original data untouched.
 
 7. Put both dumps (the customer dump converted by Pentaho and the extracted dump from your bundle version) in the  same directory.
+
 
 ## Build
 
