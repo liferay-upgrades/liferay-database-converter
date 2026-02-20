@@ -100,7 +100,6 @@ Separating schema and data ensures that only the structural part is processed by
 
 7. Put both dumps (the customer dump converted by Pentaho and the extracted dump from your bundle version) in the  same directory.
 
-
 ## Build
 
 - Go to the root project folder, and execute:
@@ -114,8 +113,8 @@ Separating schema and data ensures that only the structural part is processed by
 -d --database-type    to reference the database will be converted (must be **postgresql|mysql**)
 -in --index-name      to reference the unique index(es) to skip
 -p --path             to reference the path where the files are located
--sf --source-file     to reference the source file name
--tf --target-file     to reference the target file name
+-sf --source-file     to reference the source file name (the clean database schema dump from your bundle version)
+-tf --target-file     to reference the target file name (the customer data dump extracted from Pentaho)
 ```
 
 ## Run
@@ -123,6 +122,29 @@ Separating schema and data ensures that only the structural part is processed by
 ``` 
 java -jar build/libs/liferay-database-migrate-tools-[current-version]-SNAPSHOT.jar -d [DATABASE-TYPE] -in [Index(es)](Optional flag) -p [FULL-DIRECTORY-FILES-ARE-ALOCATED] -sf [SOURCE-FILE].sql -tf [TARGET-FILE].sql -nf [NEW-DUMP-NAME].sql
 ```
+
+## How to test
+
+To verify the migration and import process, follow these steps:
+
+1. Prepare Scripts
+   Ensure your SQL dumps are named with numeric prefixes and placed in the local directory mapped to ``/docker-entrypoint-initdb.d/`` in your ``docker-compose.yml``. Docker executes these scripts alphabetically, ensuring the schema exists before the data is inserted:
+   ```
+   01-schema.sql: Structure and table definitions.
+   02-data.sql: Data records and inserts.
+   ```
+
+
+2. Trigger Import
+   Run the following command to build the environment and start the database. Docker will automatically detect and execute the scripts in the specified order:
+   ```
+   docker compose up -d [DATABASE-SERVICE-NAME]
+   ```
+
+3. Verify Results Logs: Check for successful execution using 
+   ```
+   docker compose -f logs [DATABASE-SERVICE-NAME]
+   ```
 
 ### Note
 > This application will fix column and constraint issues using the Pentaho tool.
