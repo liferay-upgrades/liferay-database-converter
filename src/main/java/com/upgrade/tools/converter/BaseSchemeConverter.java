@@ -192,12 +192,9 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         Set<String> columns = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
 
         for (String column : columnContent.split(",\\n")) {
-            if (column.trim().toUpperCase().startsWith("PRIMARY") ||
-                    column.trim().toUpperCase().startsWith("UNIQUE")  ||
-                    column.trim().toUpperCase().startsWith("FOREIGN") ||
-                    column.trim().toUpperCase().startsWith("KEY")     ||
-                    column.trim().toUpperCase().startsWith("CONSTRAINT")) {
+            String upperColumn = column.trim().toUpperCase();
 
+            if (upperColumn.matches("^(PRIMARY|UNIQUE|FOREIGN|KEY|CONSTRAINT)\\b.*")) {
                 continue;
             }
 
