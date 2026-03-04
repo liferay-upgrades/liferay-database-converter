@@ -1,150 +1,143 @@
-# How to use the App to fix Column Issues
+## Overview
+This application fixes column and constraint inconsistencies between two Liferay database schemas. 
+It compares two DDL-only SQL files (schema structure only — no data) and generates a corrected schema file compatible with the target database.
+
+### Typical use case:
+1. Schema processed by Pentaho
+2. Migration between environments
+3. Column or constraint mismatches after upgrade
 
 ## Requirements:
 - Java 21
 - Docker and Docker Compose
 - Gradle
-  
-### How to get a dump file from Customer's Liferay Database Scheme
 
-1. In your customer liferay's workspace, run: 
-   
-   a. ``./gradlew initBundle``
+## ⚠️ Important Clarification About SOURCE vs TARGET
+This is critical:
+   - SOURCE (-sf) → The correct reference structure (from your clean bundle)
+   - TARGET (-tf) → The schema that needs to be fixed (customer schema)
 
-   b. Deploy all custom modules, and make sure that they are in 'bundles/osgi/modules'
+The tool analyzes differences and generates a corrected version of the TARGET schema.
 
-2. Create a MySQL|PostgreSQL Docker image using the customer workspace:
+### Generating Schema Dumps
+You must generate schema-only dumps from both environments.
 
-   a. Create a Docker service for PostgreSQL, something like:
-
-      ```
-      database:
-         image: postgres:14.13
-         environment:
-           - POSTGRES_USER=[CUSTOMER_USER_NAME]
-           - POSTGRES_PASSWORD=[CUSTOMER_PASSWORD]
-           - POSTGRES_DB=[CUSTOMER_SCHEME_NAME]
-         healthcheck:
-           test: [ "CMD", "pg_isready", "-U", "[CUSTOMER_USER_NAME]", "-d", "[CUSTOMER_SCHEME_NAME]", "-h", "[DOMAIN]" ]
-           interval: 10s
-           timeout: 5s
-           retries: 2
-         ports:
-           - "[PORT]:5432"
-      ```
-      > You can follow something similar to MySQL
-
-3. Spin up Docker database service:
-   
-   ```
-   docker compose up --build [DATABASE-SERVICE-NAME] -d
-   ```
-
-4. In your database properties, replace the new database scheme.  
-    MySQL:
-    ```
-    jdbc.default.driverClassName=com.mysql.cj.jdbc.Driver
-    jdbc.default.url=jdbc:mysql://[DOMAIN]:3307/[CUSTOMER_SCHEME_NAME]?useUnicode=true&characterEncoding=UTF-8&useFastDateParsing=false
-    jdbc.default.username=[CUSTOMER_USER_NAME]
-    jdbc.default.password=[CUSTOMER_PASSWORD]
-    ```
-    PostgreSQL: 
-    ```
-    jdbc.default.driverClassName=org.postgresql.Driver
-    jdbc.default.url=jdbc:postgresql://[DOMAIN]:5432/[CUSTOMER_SCHEME_NAME]
-    jdbc.default.username=[CUSTOMER_USER_NAME]
-    jdbc.default.password=[CUSTOMER_PASSWORD]
-    ```
-   
-   Note
-   > These configurations can be in Liferay's Docker service as environment variables
-
-5. Start the customer portal using Docker or Catalina, and take the Liferay database scheme in 'PostgreSQL/MySQL'
-
-6. After starting the portal, go to the Docker container and extract a dump file:
-   -  Go to Docker container:
-   
-    ```
-    docker compose exec mysql|postgresql bash
-    ```
-    
-    - Run the following command to generate a dump
-       
-    MySQL:
-    
-    ```
-    mysqldump -u [CUSTOMER_USER_NAME] -p[CUSTOMER_PASSWORD] --no-data [CUSTOMER_SCHEMA_NAME] > output_schema.sql
-    ```
-
-    ```
-    mysqldump -u [CUSTOMER_USER_NAME] -p[CUSTOMER_PASSWORD] --no-create-info [CUSTOMER_SCHEMA_NAME] > output_data.sql
-    ```
-    
-    PostgreSQL:
-
-    ```
-    pg_dump -U postgres -d [DATABASE_NAME] --schema-only > output_schema.sql
-    ```
-
-    ```
-    pg_dump -U postgres -d [DATABASE_NAME] --data-only > output_data.sql
-    ```
-    
-
-- Copy the dump out from the container:
-
-    ```
-    docker compose cp mysql|postgres:/[file-name-dump-with-timestamp.sql] [destination folder]
-    ```
-Separating schema and data ensures that only the structural part is processed by the tool while preserving the original data untouched.
-
-7. Put both dumps (the customer dump converted by Pentaho and the extracted dump from your bundle version) in the  same directory.
-
-## Build
-
-- Go to the root project folder, and execute:
-
-    ``./gradlew build``
-  
-## How to run the project by pipeline
-
-- Flags: 
+**PostgresSQL**
 ```
--d --database-type    to reference the database will be converted (must be **postgresql|mysql**)
--in --index-name      to reference the unique index(es) to skip
--p --path             to reference the path where the files are located
--sf --source-file     to reference the source file name (the clean database schema dump from your bundle version)
--tf --target-file     to reference the target file name (the customer data dump extracted from Pentaho)
+pg_dump -U [USER] -d [DATABASE] --schema-only > schema.sql
+```
+**MySQL**
+```
+mysqldump -u [USER] -p[PASSWORD] --no-data [DATABASE] > schema.sql
+```
+Make sure:
+   1. The source schema comes from your clean bundle deployment.
+   2. The target schema comes from the customer database.
+
+### Build
+```
+./gradlew build
+```
+The JAR will be generated in: 
+``
+build/libs/
+``
+
+### Run
+```
+java -jar build/libs/liferay-database-migrate-tools-[version].jar \
+   -d postgresql \
+   -p /path/to/files \
+   -sf bundle_schema.sql \
+   -tf customer_schema.sql \
+   -nf fixed_schema.sql
 ```
 
-## Run
+### Parameters
+| Flag  | Description                              |
+| ----- | ---------------------------------------- |
+| `-d`  | Database type (`postgresql` or `mysql`)  |
+| `-p`  | Directory where files are located        |
+| `-sf` | Source schema file (reference structure) |
+| `-tf` | Target schema file (schema to fix)       |
+| `-nf` | Output file name                         |
+| `-in` | Index names to skip (optional)           |
 
-``` 
-java -jar build/libs/liferay-database-migrate-tools-[current-version]-SNAPSHOT.jar -d [DATABASE-TYPE] -in [Index(es)](Optional flag) -p [FULL-DIRECTORY-FILES-ARE-ALOCATED] -sf [SOURCE-FILE].sql -tf [TARGET-FILE].sql -nf [NEW-DUMP-NAME].sql
+### Output
+The tool generates:
+```
+fixed_schema.sql
 ```
 
-## How to test
+### Validation (Updated Version — Clear & Correct)
+After generating fixed_schema.sql, you can validate it by importing it into a fresh database together with the original customer data.
 
-To verify the migration and import process, follow these steps:
+#### Step 1 — Prepare the Files
+You will need:
 
-1. Prepare Scripts
-   Ensure your SQL dumps are named with numeric prefixes and placed in the local directory mapped to ``/docker-entrypoint-initdb.d/`` in your ``docker-compose.yml``. Docker executes these scripts alphabetically, ensuring the schema exists before the data is inserted:
-   ```
-   01-schema.sql: Structure and table definitions.
-   02-data.sql: Data records and inserts.
-   ```
+| File            | Description                                                |
+| --------------- | ---------------------------------------------------------- |
+| `01-schema.sql` | The generated `fixed_schema.sql`                           |
+| `02-data.sql`   | The **data-only dump from the customer (target) database** |
 
+**⚠️ Important**:
 
-2. Trigger Import
-   Run the following command to build the environment and start the database. Docker will automatically detect and execute the scripts in the specified order:
-   ```
-   docker compose up -d [DATABASE-SERVICE-NAME]
-   ```
+01-schema.sql → generated by this tool
+02-data.sql → extracted separately using --data-only
 
-3. Verify Results Logs: Check for successful execution using 
-   ```
-   docker compose -f logs [DATABASE-SERVICE-NAME]
-   ```
+The tool does not generate data dumps
 
-### Note
-> This application will fix column and constraint issues using the Pentaho tool.
+**How to Generate 02-data.sql**
+
+PostgresSQL
+```
+pg_dump -U [USER] -d [DATABASE] --data-only > 02-data.sql
+```
+MySQL
+```
+mysqldump -u [USER] -p[PASSWORD] --no-create-info [DATABASE] > 02-data.sql
+```
+
+This file must come from the same target database used as -tf.
+
+### Step 2 — Rename Files
+Ensure they are named with numeric prefixes:
+```
+01-schema.sql
+02-data.sql
+```
+
+### Step 3 — Mount Into Docker
+Place both files in a directory mapped to:
+```
+/docker-entrypoint-initdb.d/
+```
+Example in docker-compose.yml:
+```
+volumes:
+  - ./init-scripts:/docker-entrypoint-initdb.d
+```
+
+### Step 4 — Start Database
+```
+docker compose up -d database
+```
+Docker will execute:
+  1. Schema first
+  2. Data after
+ 
+### Step 5 — Verify Logs
+```
+docker compose logs -f database
+```
+If no errors appear, the schema fix is valid.
+
+### Common Errors
+1. Swapping source and target files
+2. Using dumps with data
+3. Using incomplete schema exports
+4. Wrong database type flag
+
+### Notes
+- Processes structural DDL only
+- Does not modify data
