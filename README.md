@@ -141,3 +141,9 @@ If no errors appear, the schema fix is valid.
 ### Notes
 - Processes structural DDL only
 - Does not modify data
+
+### Full Workflow
+
+<div style="display: table; max-width: 550px; padding: 10px;">
+   <img src="/src/main/resources/mermaid-diagram.png" alt="diagram" />
+</div>
