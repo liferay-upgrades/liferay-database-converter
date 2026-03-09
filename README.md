@@ -20,7 +20,33 @@ This is critical:
 The tool analyzes differences and generates a corrected version of the TARGET schema.
 
 ## Generating Schema Dumps
-You must generate schema-only dumps from both environments.
+You must generate schema-only dumps (DDL) from both your Source and Target environments.
+
+### Preparing the Source Environment
+
+Before generating a dump, you must initialize a clean Liferay bundle to ensure the database tables are correctly created and populated with default metadata
+
+#### Initialize the Bundle 
+Inside your Liferay Customer Workspace, run:
+
+```
+./gradlew initBundle
+```
+
+Note: This must be executed within a valid Liferay Workspace.
+
+#### Startup & Validation: 
+Start the Liferay instance and connect it to a clean database using docker or docker compose, you can refer to [Official Docker documentation](https://docs.docker.com/). The source schema should only be extracted after the first successful startup. Monitor your logs for the following indicators that the database is ready:
+
+**Example:** 
+```
+[DialectDetector] Using dialect org.hibernate.dialect.PostgreSQLDialect
+[DBInitUtil] Create tables and populate with default data
+```
+**Note:** Version Consistency - Crucial - The Liferay version used for this clean bundle must match the original pre-upgrade version of the customer database to avoid schema incompatibilities.
+
+### Exporting the Schema
+Once the environments are ready, use the following commands to export the structure without the data:
 
 **PostgresSQL**
 ```
