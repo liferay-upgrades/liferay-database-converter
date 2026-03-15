@@ -8,9 +8,7 @@ import com.upgrade.tools.executor.SchemeConverterExecutor;
 public class SchemeConverterMain {
 
     public static void main(String[] args) throws Exception {
-
         SchemeConverterExecutor.executor(args);
-
     }
 
 }

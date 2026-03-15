@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
 /**
  * @author Albert Gomes Cabral
  */
-public abstract class BaseSchemeConverter implements SchemeConverter {
+public abstract class BaseSchemeConverter
+    implements SchemeConverter {
 
     protected abstract Pattern getContextPattern();
 
@@ -58,22 +59,26 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
             Map<String, List<String>> contentsMap = _readFiles(
                 path, sourceName, targetName);
 
-            String sourceContent = contentsMap.get("source.content").getFirst();
+            String sourceContent = contentsMap.get(
+                "source.content").getFirst();
 
-            List<String> targetContentChunks = contentsMap.get("target.content");
+            List<String> targetContentChunks = contentsMap.get(
+                "target.content");
 
             List<String> resultTargetContentChunks =
                 new ArrayList<>(targetContentChunks.size());
 
             for (String targetContent : targetContentChunks) {
                 targetContent = _converterContextPattern(
-                    sourceContent, targetContent, getContextPattern(), keys);
+                    sourceContent, targetContent, getContextPattern(),
+                    keys);
 
                 resultTargetContentChunks.add(targetContent);
             }
 
             _writerResult(
-                postProcess(resultTargetContentChunks, sourceContent, keys),
+                postProcess(
+                    resultTargetContentChunks, sourceContent, keys),
                 path, newName);
         }
         catch (Exception exception) {
@@ -92,7 +97,8 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
     }
 
     private String _converterContextPattern(
-        String sourceContent, String targetContent, Pattern pattern, List<String> keys) {
+        String sourceContent, String targetContent, Pattern pattern,
+        List<String> keys) {
 
         Matcher matcherTarget = pattern.matcher(targetContent);
         StringBuilder sb = new StringBuilder();
@@ -105,7 +111,8 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
                 String tableNameTarget = matcherTarget.group(1);
 
                 if (tableNameSource.equalsIgnoreCase(tableNameTarget)) {
-                    Print.info(String.format("Converting %s table", tableNameSource));
+                    Print.info(String.format(
+                        "Converting %s table", tableNameSource));
 
                     String columnsSource = matcherSource.group(2);
                     String columnsTarget = matcherTarget.group(2);
@@ -114,7 +121,7 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
                         columnsSource, columnsTarget);
 
                     convertedColumns = beforeProcess(
-                            convertedColumns, columnsSource, keys);
+                        convertedColumns, columnsSource, keys);
 
                     matcherTarget.appendReplacement(
                         sb,
@@ -124,7 +131,9 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
                                 .replace(tableNameTarget, tableNameSource)
                         ));
 
-                    Print.replacement(columnsTarget, convertedColumns, pattern);
+                    Print.replacement(
+                        columnsTarget, convertedColumns, pattern);
+
                     break;
                 }
             }
@@ -158,20 +167,26 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
 
         while (matcherTarget.find()) {
             for (String column : newColumns) {
-                Matcher matcherColumn = _COLUMN_NAME_PATTERN.matcher(column);
+                Matcher matcherColumn = _COLUMN_NAME_PATTERN.matcher(
+                    column);
 
                 while (matcherColumn.find()) {
-                    String normalizeTargetColumn = matcherTarget.group(1).replaceAll(
-                        "\"", "");
-                    String normalizeNewColumn = matcherColumn.group(1).replaceAll(
-                        "\"", "");
+                    String normalizeTargetColumn =
+                        matcherTarget.group(1).replaceAll(
+                            "\"", "");
+                    String normalizeNewColumn =
+                        matcherColumn.group(1).replaceAll(
+                            "\"", "");
 
-                    if (normalizeTargetColumn.equalsIgnoreCase(normalizeNewColumn)) {
+                    if (normalizeTargetColumn.equalsIgnoreCase(
+                        normalizeNewColumn)) {
+
                         index++;
 
                         matcherTarget.appendReplacement(
                             sb, Matcher.quoteReplacement(
-                                    _concat(column, index, newColumns.size())));
+                                _concat(
+                                    column, index, newColumns.size())));
                     }
                 }
             }
@@ -182,7 +197,9 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         return sb.toString();
     }
 
-    private String _getConvertedColumns(String sourceColumns, String targetColumns) {
+    private String _getConvertedColumns(
+        String sourceColumns, String targetColumns) {
+
         return _formatColumns(
             _newColumnsResults(sourceColumns, targetColumns),
             targetColumns);
@@ -194,7 +211,8 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         for (String column : columnContent.split(",\\n")) {
             String upperColumn = column.trim().toUpperCase();
 
-            if (upperColumn.matches("^(PRIMARY|UNIQUE|FOREIGN|KEY|CONSTRAINT)\\b.*")) {
+            if (upperColumn.matches(
+                "^(PRIMARY|UNIQUE|FOREIGN|KEY|CONSTRAINT)\\b.*")) {
                 continue;
             }
 
@@ -215,25 +233,27 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
         Set<String> newColumns = new HashSet<>(sourceColumnsSet);
 
         targetColumnsSet.forEach(
-                (column) -> {
-                    Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
+            (column) -> {
+                Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
 
-                    if (matcher.find()) {
-                        String columnTargetNormalized = matcher.group(1)
-                            .replaceAll("\"", "")
-                            .replaceAll("`", "")
-                            .toLowerCase();
+                if (matcher.find()) {
+                    String columnTargetNormalized = matcher.group(1)
+                        .replaceAll("\"", "")
+                        .replaceAll("`", "")
+                        .toLowerCase();
 
-                        boolean exists = sourceColumnsSet.stream()
-                            .map(this::_extractColumnName)
-                            .filter(Objects::nonNull)
-                            .anyMatch(name -> name.equalsIgnoreCase(columnTargetNormalized));
+                    boolean exists = sourceColumnsSet.stream()
+                        .map(this::_extractColumnName)
+                        .filter(Objects::nonNull)
+                        .anyMatch(
+                            name -> name.equalsIgnoreCase(
+                                columnTargetNormalized));
 
-                        if (exists) return;
+                    if (exists) return;
 
-                        newColumns.add(column);
-                    }
+                    newColumns.add(column);
                 }
+            }
         );
 
         return newColumns;
@@ -257,18 +277,26 @@ public abstract class BaseSchemeConverter implements SchemeConverter {
     }
 
     private Map<String, List<String>> _readFiles(
-        String path, String sourceName, String targetName) throws Exception {
+            String path, String sourceName, String targetName)
+        throws Exception {
 
         try {
-            if (!sourceName.endsWith(_VALID_EXTENSION) || !targetName.endsWith(_VALID_EXTENSION)) {
-                throw new Exception("File extension must ends with " + _VALID_EXTENSION);
+            if (!sourceName.endsWith(_VALID_EXTENSION) ||
+                !targetName.endsWith(_VALID_EXTENSION)) {
+
+                throw new Exception(
+                    "File extension must ends with " + _VALID_EXTENSION);
             }
 
-            InputStream sourceInputStream = new FileInputStream(path + sourceName);
+            InputStream sourceInputStream = new FileInputStream(
+                path + sourceName);
 
-            InputStream targetInputStream = new FileInputStream(path + targetName);
+            InputStream targetInputStream = new FileInputStream(
+                path + targetName);
 
-            if (sourceInputStream.read() <= 0 || targetInputStream.read() <= 0) {
+            if (sourceInputStream.read() <= 0 ||
+                targetInputStream.read() <= 0) {
+
                 throw new Exception("File content cannot be empty");
             }
 

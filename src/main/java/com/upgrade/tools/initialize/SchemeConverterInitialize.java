@@ -28,7 +28,7 @@ public class SchemeConverterInitialize {
                 default ->
                     throw new ConverterException(
                         "Database type not supported %s".formatted(
-                                databaseType));
+                            databaseType));
             };
         }
         catch (ConverterException converterException) {

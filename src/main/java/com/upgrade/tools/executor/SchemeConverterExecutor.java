@@ -25,23 +25,25 @@ public class SchemeConverterExecutor {
 
         if (params == null) {
             throw new RuntimeException(
-                "Is mandatory to inform valid arguments to execute it. \n" +
-                        "Type --help to see the usage");
+                "Is mandatory to inform valid arguments to execute it." +
+                    "\nType --help to see the usage");
         }
 
         long start = System.nanoTime();
 
-        SchemeConverter schemeConverter = SchemeConverterInitialize.getConverterType(
-            params.databaseType);
+        SchemeConverter schemeConverter =
+            SchemeConverterInitialize.getConverterType(
+                params.databaseType);
 
         schemeConverter.converter(
-            params.path, params.sourceFileName, params.targetFileName, params.newFileName,
-            params.indexesName);
+            params.path, params.sourceFileName, params.targetFileName,
+            params.newFileName, params.indexesName);
 
         if (ResultsThreadLocal.getResultsThreadLocal()) {
             Print.info(
-                "Converted with success. Completed in %d seconds"
-                    .formatted(System.nanoTime() - start / 1_000_000_000));
+                ("Converted with success. " +
+                    "Completed in %d seconds").formatted(
+                        System.nanoTime() - start / 1_000_000_000));
         }
         else {
             Print.error("Converter fail. Try again.");

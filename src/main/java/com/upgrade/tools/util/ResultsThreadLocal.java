@@ -14,6 +14,6 @@ public class ResultsThreadLocal {
     }
 
     private static final ThreadLocal<Boolean> _resultsThreadLocal =
-            ThreadLocal.withInitial(() -> false);
+        ThreadLocal.withInitial(() -> false);
 
 }
