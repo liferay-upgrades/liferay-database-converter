@@ -4,6 +4,7 @@ import com.upgrade.tools.exception.ConverterException;
 import com.upgrade.tools.util.Print;
 import com.upgrade.tools.util.ResultsThreadLocal;
 import com.upgrade.tools.util.SchemeConverterUtil;
+import com.upgrade.tools.util.TransformUtil;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -105,8 +106,9 @@ public abstract class BaseSchemeConverter
     }
 
     private String _converterContextPattern(
-        String sourceContent, String targetContent, Pattern pattern,
-        List<String> keys) {
+            String sourceContent, String targetContent, Pattern pattern,
+            List<String> keys)
+        throws ConverterException {
 
         Matcher matcherTarget = pattern.matcher(targetContent);
         StringBuilder sb = new StringBuilder();
@@ -150,6 +152,19 @@ public abstract class BaseSchemeConverter
         matcherTarget.appendTail(sb);
 
         return sb.toString();
+    }
+
+    private String _extractNormalizedColumnName(String column) {
+        Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
+
+        if (!matcher.find()) {
+            return null;
+        }
+
+        return matcher.group(1)
+            .replace("\"", "")
+            .replace("`", "")
+            .toLowerCase();
     }
 
     private String _extractColumnName(String column) {
@@ -234,35 +249,36 @@ public abstract class BaseSchemeConverter
         return columns;
     }
 
-    private Set<String> _newColumnsResults(String sourceColumns, String targetColumns) {
+    private Set<String> _newColumnsResults(
+        String sourceColumns, String targetColumns) {
+
         Set<String> sourceColumnsSet = _getColumnsSet(sourceColumns);
         Set<String> targetColumnsSet = _getColumnsSet(targetColumns);
 
+        Set<String> sourceColumnNames =
+            TransformUtil.transformToSet(
+                sourceColumnsSet,
+                this::_extractNormalizedColumnName);
+
         Set<String> newColumns = new HashSet<>(sourceColumnsSet);
 
-        targetColumnsSet.forEach(
-            (column) -> {
-                Matcher matcher = _COLUMN_NAME_PATTERN.matcher(column);
+        newColumns.addAll(
+            TransformUtil.transformToSet(
+                targetColumnsSet,
+                (column) -> {
+                    String name = _extractNormalizedColumnName(
+                        column);
 
-                if (matcher.find()) {
-                    String columnTargetNormalized = matcher.group(1)
-                        .replaceAll("\"", "")
-                        .replaceAll("`", "")
-                        .toLowerCase();
+                    if (name == null) {
+                        return null;
+                    }
 
-                    boolean exists = sourceColumnsSet.stream()
-                        .map(this::_extractColumnName)
-                        .filter(Objects::nonNull)
-                        .anyMatch(
-                            name -> name.equalsIgnoreCase(
-                                columnTargetNormalized));
+                    if (sourceColumnNames.contains(name)) {
+                        return null;
+                    }
 
-                    if (exists) return;
-
-                    newColumns.add(column);
-                }
-            }
-        );
+                    return column;
+                }));
 
         return newColumns;
     }
