@@ -1,6 +1,7 @@
 package com.upgrade.tools.converter;
 
 import com.upgrade.tools.constants.SchemeConverterSupportType;
+import com.upgrade.tools.util.TransformUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -110,35 +111,31 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
     }
 
     private String _scapeKeys(String constraints, List<String> keys) {
-        StringBuilder sb = new StringBuilder();
-
         String[] constraintArray = constraints.split(",\\n");
 
-        for (int i = 0; i < constraintArray.length; i++) {
-            String constraint = constraintArray[i].trim();
+        List<String> kept = new ArrayList<>(constraintArray.length);
 
-            boolean skippedKey = keys.stream().anyMatch(constraint::contains);
+        for (String raw : constraintArray) {
+            String constraint = raw.trim();
 
-            if ((constraint.startsWith("KEY") || constraint.startsWith("UNIQUE KEY"))) {
-                if (skippedKey) {
-                    continue;
-                }
+            boolean skippedKey = TransformUtil.anyMatch(
+                keys, constraint::contains);
+
+            boolean isIndex =
+                constraint.startsWith("KEY") ||
+                    constraint.startsWith("UNIQUE KEY");
+
+            if (isIndex && skippedKey) {
+                continue;
             }
 
-            if (constraint.startsWith("PRIMARY KEY") || !skippedKey) {
-                sb.append(constraint);
-            }
-
-            if (i < constraintArray.length - 1) {
-                sb.append(",\n  ");
-            }
+            kept.add(constraint);
         }
 
-        return sb.toString();
+        return String.join(",\n  ", kept);
     }
 
     private final Pattern _TABLE_NAME_PATTERN = Pattern.compile(
         "CREATE\\s+TABLE\\s+(`[^`]+`)\\s*\\(([\\s\\S]*?\\)\\s*)(?=ENGINE|;)");
-
 
 }
