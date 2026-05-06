@@ -158,17 +158,6 @@ public abstract class BaseSchemeConverter
             .toLowerCase();
     }
 
-    private String _extractColumnName(String column) {
-        Pattern pattern = Pattern.compile("^`?\\w+`?");
-
-        String normalizeColumn = column.replaceAll(
-            "\"", "").replaceAll("`", "");
-
-        Matcher matcher = pattern.matcher(normalizeColumn);
-
-        return matcher.find() ? matcher.group() : null;
-    }
-
     private String _formatColumns(Set<String> newColumns, String columnsTarget) {
         Pattern pattern = Pattern.compile(
             "(`?\"?[a-zA-Z0-9_.-]+_?\"?`?)\\s(\\w+\\(?.+),?");
