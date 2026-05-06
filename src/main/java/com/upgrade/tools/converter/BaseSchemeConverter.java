@@ -129,7 +129,6 @@ public abstract class BaseSchemeConverter
                         Matcher.quoteReplacement(
                             matcherTarget.group(0)
                                 .replace(columnsTarget, convertedColumns)
-                                .replace(tableNameTarget, tableNameSource)
                         ));
 
                     Print.replacement(
