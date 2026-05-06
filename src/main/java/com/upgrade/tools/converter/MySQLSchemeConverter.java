@@ -1,6 +1,7 @@
 package com.upgrade.tools.converter;
 
 import com.upgrade.tools.constants.SchemeConverterSupportType;
+import com.upgrade.tools.exception.ConverterException;
 import com.upgrade.tools.util.TransformUtil;
 
 import java.util.ArrayList;
@@ -32,17 +33,24 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
 
     @Override
     protected List<String> postProcess(
-        List<String> contents, String sourceContent, List<String> indexesName) {
+            List<String> targetResults, String sourceContent,
+            List<String> indexesName)
+        throws ConverterException {
 
-        List<String> result = new ArrayList<>(contents.size());
+        try {
+            List<String> result = new ArrayList<>(targetResults.size());
 
-        for (String content : contents) {
-            String statement = _replaceStatements(content, sourceContent);
+            for (String targetResult : targetResults) {
+                result.add(
+                    _replaceStatements(
+                        targetResult, sourceContent));
+            }
 
-            result.add(statement);
+            return result;
         }
-
-        return result;
+        catch (Exception exception) {
+            throw new ConverterException(exception);
+        }
     }
 
     private String _processReplacement(
