@@ -68,11 +68,6 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
     private String _replaceStatements(String statement, String sourceStatement) {
         statement = _processReplacement(
             statement,
-            Pattern.compile("INSERT\\s+INTO\\s+`?([^`\\s]+)`?\\s+VALUES"),
-            sourceStatement);
-
-        statement = _processReplacement(
-            statement,
             Pattern.compile("DROP\\s+TABLE\\s+IF\\s+EXISTS\\s+`?([^`\\s]+)`?;"),
             sourceStatement);
 
