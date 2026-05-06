@@ -1,5 +1,7 @@
 package com.upgrade.tools.util;
 
+import jdk.jfr.MemoryAddress;
+
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -15,21 +17,24 @@ import java.util.List;
 public class SchemeConverterUtil {
 
     public static String readContent(InputStream inputStream) throws IOException {
-        StringBuilder stringBuilder = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
         try (BufferedReader bufferedReader = new BufferedReader(
                 new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
 
             String line;
 
+            sb.append("-");
+
             while ((line = bufferedReader.readLine()) != null) {
-                stringBuilder.append(line).append("\n");
+                sb.append(line).append("\n");
             }
 
-            return stringBuilder.toString();
+            return sb.toString();
         }
     }
 
+    @Deprecated
     public static List<String> readChunks(
         InputStream inputStream, int chunkSize) throws IOException {
 
@@ -70,6 +75,7 @@ public class SchemeConverterUtil {
         return chunks;
     }
 
+    @Deprecated
     public static List<String> readChunksSafe(InputStream inputStream, int bufferSize)
         throws IOException {
 
