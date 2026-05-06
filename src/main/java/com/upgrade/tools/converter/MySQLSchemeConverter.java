@@ -16,9 +16,17 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
 
     @Override
     protected String beforeProcess(
-        String content, String sourceStatement, List<String> parameters) {
+            String targetResult, String sourceStatement,
+            List<String> parameters)
+        throws ConverterException {
 
-        return _replacementConstraints(content, sourceStatement, parameters);
+        try {
+            return _replacementConstraints(
+                targetResult, sourceStatement, parameters);
+        }
+        catch (Exception exception) {
+            throw new ConverterException(exception);
+        }
     }
 
     @Override

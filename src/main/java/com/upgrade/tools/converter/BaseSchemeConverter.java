@@ -34,15 +34,23 @@ public abstract class BaseSchemeConverter
     protected abstract String getDatabaseType();
 
     protected String beforeProcess(
-        String content, String sourceStatement, List<String> keys) {
+            String targetResult, String sourceStatement,
+            List<String> indexesName)
+        throws ConverterException {
 
-        return content;
+        Objects.requireNonNull(targetResult);
+
+        return targetResult;
     }
 
     protected List<String> postProcess(
-        List<String> contents, String sourceContent, List<String> keys) {
+            List<String> targetResults, String sourceContent,
+            List<String> indexesName)
+        throws ConverterException {
 
-        return contents;
+        Objects.requireNonNull(targetResults);
+
+        return targetResults;
     }
 
     @Override
