@@ -97,12 +97,15 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
         StringBuilder sb = new StringBuilder();
 
         if (matcher.find()) {
-            sb.append(columns.replace("\n)", ","));
-            sb.append("\n");
-            sb.append("  ");
+            String trimmedColumns = columns.replaceAll(
+                ",?\\s*\\)\\s*$", "");
 
-            String keys = keysName.isEmpty() ? matcher.group() : _scapeKeys(
-                matcher.group(), keysName);
+            sb.append(trimmedColumns);
+            sb.append(",\n  ");
+
+            String keys = (keysName.isEmpty()) ?
+                matcher.group() :
+                _scapeKeys(matcher.group(), keysName);
 
             sb.append(keys);
         }
