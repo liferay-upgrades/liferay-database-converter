@@ -40,21 +40,14 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
     }
 
     @Override
-    protected List<String> postProcess(
-            List<String> targetResults, String sourceContent,
+    protected String postProcess(
+            String targetResult, String sourceContent,
             List<String> indexesName)
         throws ConverterException {
 
         try {
-            List<String> result = new ArrayList<>(targetResults.size());
-
-            for (String targetResult : targetResults) {
-                result.add(
-                    _replaceStatements(
-                        targetResult, sourceContent));
-            }
-
-            return result;
+            return _replaceStatements(
+                targetResult, sourceContent);
         }
         catch (Exception exception) {
             throw new ConverterException(exception);

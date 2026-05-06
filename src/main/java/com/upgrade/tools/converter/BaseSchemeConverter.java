@@ -12,8 +12,6 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -44,20 +42,21 @@ public abstract class BaseSchemeConverter
         return targetResult;
     }
 
-    protected List<String> postProcess(
-            List<String> targetResults, String sourceContent,
+    protected String postProcess(
+            String targetResult, String sourceContent,
             List<String> indexesName)
         throws ConverterException {
 
-        Objects.requireNonNull(targetResults);
+        Objects.requireNonNull(targetResult);
+        Objects.requireNonNull(sourceContent);
 
-        return targetResults;
+        return targetResult;
     }
 
     @Override
     public void converter(
             String path, String sourceName, String targetName, String newName,
-            List<String> keys)
+            List<String> indexNames)
         throws ConverterException {
 
         try {
@@ -65,29 +64,21 @@ public abstract class BaseSchemeConverter
                 "Starting scheme converter to %s database".formatted(
                     getDatabaseType()));
 
-            Map<String, List<String>> contentsMap = _readFiles(
+            Map<String, String> contentsMap = _readFiles(
                 path, sourceName, targetName);
 
             String sourceContent = contentsMap.get(
-                "source.content").getFirst();
+                "source.content");
 
-            List<String> targetContentChunks = contentsMap.get(
+            String targetContent = contentsMap.get(
                 "target.content");
-
-            List<String> resultTargetContentChunks =
-                new ArrayList<>(targetContentChunks.size());
-
-            for (String targetContent : targetContentChunks) {
-                targetContent = _converterContextPattern(
-                    sourceContent, targetContent, getContextPattern(),
-                    keys);
-
-                resultTargetContentChunks.add(targetContent);
-            }
 
             _writerResult(
                 postProcess(
-                    resultTargetContentChunks, sourceContent, keys),
+                    _converterContextPattern(
+                        sourceContent, targetContent,
+                        getContextPattern(), indexNames),
+                    sourceContent, indexNames),
                 path, newName);
         }
         catch (Exception exception) {
@@ -283,24 +274,23 @@ public abstract class BaseSchemeConverter
         return newColumns;
     }
 
-    private Map<String, List<String>> _readContentMap(
+    private Map<String, String> _readContentMap(
         InputStream source, InputStream target) throws IOException {
 
-        Map<String, List<String>> contentMap = new HashMap<>();
+        Map<String, String> contentMap = new HashMap<>();
 
         contentMap.put(
             "source.content",
-            Collections.singletonList(
-                SchemeConverterUtil.readContent(source)));
+            SchemeConverterUtil.readContent(source));
 
         contentMap.put(
             "target.content",
-            SchemeConverterUtil.readChunksSafe(target, 120000));
+            SchemeConverterUtil.readContent(target));
 
         return contentMap;
     }
 
-    private Map<String, List<String>> _readFiles(
+    private Map<String, String> _readFiles(
             String path, String sourceName, String targetName)
         throws Exception {
 
@@ -324,7 +314,8 @@ public abstract class BaseSchemeConverter
                 throw new Exception("File content cannot be empty");
             }
 
-            return _readContentMap(sourceInputStream, targetInputStream);
+            return _readContentMap(
+                sourceInputStream, targetInputStream);
         }
         catch (Exception exception) {
             throw new Exception(exception);
@@ -333,15 +324,13 @@ public abstract class BaseSchemeConverter
     }
 
     private void _writerResult(
-            List<String> contents, String path, String newName)
+            String content, String path, String newName)
         throws IOException {
 
         File file = new File(path + newName);
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            for (String content : contents) {
-                writer.write(content);
-            }
+            writer.write(content);
 
             ResultsThreadLocal.setResultsThreadLocal(true);
         }

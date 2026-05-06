@@ -1,9 +1,8 @@
 package com.upgrade.tools.converter;
 
 import com.upgrade.tools.constants.SchemeConverterSupportType;
-import com.upgrade.tools.util.Print;
+import com.upgrade.tools.exception.ConverterException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,7 +14,10 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
 
     @Override
     protected Pattern getContextPattern() {
-        return _TABLE_NAME_PATTERN;
+        return Pattern.compile(
+            "CREATE\\s+TABLE\\s+(?:public\\.)?([a-zA-Z_0-9]+)\\s*" +
+                    "\\(([^)]*?(\\([^)]*\\)[^)]*?)*)\\);",
+            Pattern.DOTALL);
     }
 
     @Override
@@ -24,26 +26,30 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
     }
 
     @Override
-    protected List<String> postProcess(
-        List<String> contents, String sourceContent, List<String> indexesName) {
+    protected String postProcess(
+            String targetResult, String sourceContent,
+            List<String> indexesName)
+        throws ConverterException {
 
-        return _postProcess(contents, sourceContent, indexesName);
+        try {
+            return _postProcess(
+                targetResult, sourceContent, indexesName);
+        }
+        catch (Exception exception) {
+            throw new ConverterException(exception);
+        }
     }
 
-    private List<String> _postProcess(
-        List<String> targetStatements, String sourceStatement, List<String> indexesName) {
+    private String _postProcess(
+        String targetStatement, String sourceStatement,
+        List<String> indexesName) {
 
-        List<String> resultStatements = _attributesTransform(targetStatements);
-
-        resultStatements.add(
-            _addIndexesRulesAndAlterTable(
-                targetStatements.getLast(), sourceStatement, indexesName));
-
-        return resultStatements;
+         return _addIndexesRulesAndAlterTable(
+            targetStatement, sourceStatement, indexesName);
     }
 
     private String _addIndexesRulesAndAlterTable(
-        String lasContent, String sourceStatement, List<String> indexesName) {
+        String targetResult, String sourceStatement, List<String> indexesName) {
 
         Pattern alterTableOnly = Pattern.compile(
             "ALTER TABLE ONLY\\s+public\\.(?!\\w+_x_\\d+)\\w+\\s+" +
@@ -54,7 +60,7 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
         String delimiter = "--\n" + "-- PostgreSQL database dump complete";
 
         while (alterTableOnlyMatcher.find()) {
-            lasContent = lasContent.replace(
+            targetResult = targetResult.replace(
                 delimiter, alterTableOnlyMatcher.group() + "\n" + delimiter
             );
         }
@@ -65,7 +71,7 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
         Matcher indexesMatcher = indexesPattern.matcher(sourceStatement);
 
         while (indexesMatcher.find()) {
-            lasContent = lasContent.replace(
+            targetResult = targetResult.replace(
                 delimiter, indexesMatcher.group() + "\n\n" + delimiter
             );
         }
@@ -87,7 +93,7 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
                 }
             }
 
-            lasContent = lasContent.replace(
+            targetResult = targetResult.replace(
                 delimiter, uniqueIndexesMatcher.group() + "\n\n" + delimiter
             );
         }
@@ -98,51 +104,12 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
         Matcher createRulesMatcher = createRulesPattern.matcher(sourceStatement);
 
         while (createRulesMatcher.find()) {
-            lasContent = lasContent.replace(
+            targetResult = targetResult.replace(
                 delimiter, createRulesMatcher.group() + "\n\n" + delimiter
             );
         }
 
-        return lasContent;
+        return targetResult;
     }
-
-    private List<String> _attributesTransform(List<String> statements) {
-        List<String> resultStatements = new ArrayList<>();
-
-        int index = 0;
-
-        for (String statement : statements) {
-            index++;
-
-            if (index == statements.size()) {
-                break;
-            }
-
-            Pattern copyStatementPattern = Pattern.compile(
-                "COPY\\s*public\\.(\\w+)\\s+(\\(.*\\))\\s+FROM\\s+\\w+;");
-
-            Matcher copyStatementMatcher = copyStatementPattern.matcher(statement);
-
-            while (copyStatementMatcher.find()) {
-                String tableName = copyStatementMatcher.group(1);
-
-                Print.info("Applying to %s".formatted(tableName));
-
-                String copyStatement = copyStatementMatcher.group(2);
-
-                statement = statement.replace(
-                    copyStatement, copyStatement.toLowerCase());
-            }
-
-            resultStatements.add(statement);
-        }
-
-        return resultStatements;
-    }
-
-    private final Pattern _TABLE_NAME_PATTERN = Pattern.compile(
-        "CREATE\\s+TABLE\\s+(?:public\\.)?([a-zA-Z_0-9]+)\\s*" +
-                "\\(([^)]*?(\\([^)]*\\)[^)]*?)*)\\);",
-        Pattern.DOTALL);
 
 }
