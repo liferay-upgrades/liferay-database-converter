@@ -1,6 +1,7 @@
 package com.upgrade.tools.util;
 
 import java.io.PrintStream;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
@@ -87,8 +88,10 @@ public class Print {
         String formatted = (args == null || args.length == 0) ?
             message : String.format(message, args);
 
+        String timestamp = LocalDateTime.now().format(_TIMESTAMP_FORMAT);
+
         stream.println(
-            _TIMESTAMP_FORMAT + " " + _colorize(color, label) + " " + formatted);
+            timestamp + " " + _colorize(color, label) + " " + formatted);
     }
 
     private static final boolean _COLOR_ENABLED = _detectColorSupport();
