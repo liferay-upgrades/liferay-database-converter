@@ -157,8 +157,7 @@ public class SchemeConverterExecutor {
         params.targetFileName = _promptSqlFile(
             scanner, "Target file name (customer schema to fix)",
             params.path);
-        params.newFileName = _promptOutputFileName(
-            scanner, "fixed_schema.sql");
+        params.newFileName = _promptOutputFileName(scanner);
         params.indexesName = _promptIndexesToSkip(scanner);
 
         _printSummary(params);
@@ -214,7 +213,7 @@ public class SchemeConverterExecutor {
 
     private static String _promptDatabaseType(Scanner scanner) {
         while (true) {
-            System.out.print("Database type [mysql/postgresql]: ");
+            System.out.print("Select database type [mysql/postgresql]: ");
 
             String input = scanner.nextLine().trim().toLowerCase();
 
@@ -279,8 +278,8 @@ public class SchemeConverterExecutor {
         return indexes;
     }
 
-    private static String _promptOutputFileName(
-        Scanner scanner, String defaultName) {
+    private static String _promptOutputFileName(Scanner scanner) {
+        String defaultName = "fixed_schema.sql";
 
         System.out.print(
             "Output file name [" + defaultName + "]: ");
