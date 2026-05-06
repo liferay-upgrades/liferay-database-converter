@@ -5,7 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.regex.Pattern;
 
 /**
- * @author Albett Gomes Cabral
+ * @author Albert Gomes Cabral
  */
 public class Print {
 
