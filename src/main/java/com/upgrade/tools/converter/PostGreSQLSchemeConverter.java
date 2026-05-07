@@ -12,12 +12,18 @@ import java.util.regex.Pattern;
  */
 public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
 
+    /**
+     * Marker that PostgreSQL's {@code pg_dump} writes at the very end of a
+     * dump file. We splice ALTER TABLE / CREATE INDEX / CREATE RULE
+     * statements from the source dump <strong>just before</strong> this
+     * marker so the resulting file remains a valid pg_dump output.
+     */
+    static final String DUMP_COMPLETE_DELIMITER =
+        "--\n-- PostgreSQL database dump complete";
+
     @Override
     protected Pattern getContextPattern() {
-        return Pattern.compile(
-            "CREATE\\s+TABLE\\s+(?:public\\.)?([a-zA-Z_0-9]+)\\s*" +
-                    "\\(([^)]*?(\\([^)]*\\)[^)]*?)*)\\);",
-            Pattern.DOTALL);
+        return _CONTEXT_PATTERN;
     }
 
     @Override
@@ -32,84 +38,82 @@ public class PostGreSQLSchemeConverter extends BaseSchemeConverter {
         throws ConverterException {
 
         try {
-            return _postProcess(
+            return _addIndexesRulesAndAlterTable(
                 targetResult, sourceContent, indexesName);
         }
         catch (Exception exception) {
-            throw new ConverterException(exception);
+            throw new ConverterException(
+                "PostgreSQL post-processing failed", exception);
         }
-    }
-
-    private String _postProcess(
-        String targetStatement, String sourceStatement,
-        List<String> indexesName) {
-
-         return _addIndexesRulesAndAlterTable(
-            targetStatement, sourceStatement, indexesName);
     }
 
     private String _addIndexesRulesAndAlterTable(
         String targetResult, String sourceStatement, List<String> indexesName) {
 
-        Pattern alterTableOnly = Pattern.compile(
-            "ALTER TABLE ONLY\\s+public\\.(?!\\w+_x_\\d+)\\w+\\s+" +
-                "ADD CONSTRAINT\\s+.*?PRIMARY KEY\\s*\\(.*?\\);\n");
+        targetResult = _spliceMatches(
+            targetResult, _ALTER_TABLE_ONLY_PATTERN, sourceStatement, "\n");
 
-        Matcher alterTableOnlyMatcher = alterTableOnly.matcher(sourceStatement);
+        targetResult = _spliceMatches(
+            targetResult, _INDEX_PATTERN, sourceStatement, "\n\n");
 
-        String delimiter = "--\n" + "-- PostgreSQL database dump complete";
-
-        while (alterTableOnlyMatcher.find()) {
-            targetResult = targetResult.replace(
-                delimiter, alterTableOnlyMatcher.group() + "\n" + delimiter
-            );
-        }
-
-        Pattern indexesPattern = Pattern.compile(
-            "CREATE\\s+INDEX\\s+(\\w+)\\s+ON\\s+public\\.(\\w+.*);");
-
-        Matcher indexesMatcher = indexesPattern.matcher(sourceStatement);
-
-        while (indexesMatcher.find()) {
-            targetResult = targetResult.replace(
-                delimiter, indexesMatcher.group() + "\n\n" + delimiter
-            );
-        }
-
-        Pattern uniqueIndexesPattern = Pattern.compile(
-        "CREATE\\s+UNIQUE\\s+INDEX\\s+(\\w+)\\s+ON" +
-                "\\s+public\\.(\\w+.*);");
-
-        Matcher uniqueIndexesMatcher =
-            uniqueIndexesPattern.matcher(sourceStatement);
+        Matcher uniqueIndexesMatcher = _UNIQUE_INDEX_PATTERN.matcher(
+            sourceStatement);
 
         while (uniqueIndexesMatcher.find()) {
+            if (!indexesName.isEmpty() &&
+                indexesName.contains(uniqueIndexesMatcher.group(1))) {
 
-            if (!indexesName.isEmpty()){
-                String sourceUniqueIndexMatcher = uniqueIndexesMatcher.group(1);
-
-                if (indexesName.contains(sourceUniqueIndexMatcher)) {
-                    continue;
-                }
+                continue;
             }
 
             targetResult = targetResult.replace(
-                delimiter, uniqueIndexesMatcher.group() + "\n\n" + delimiter
-            );
+                DUMP_COMPLETE_DELIMITER,
+                uniqueIndexesMatcher.group() + "\n\n" +
+                    DUMP_COMPLETE_DELIMITER);
         }
 
-        Pattern createRulesPattern = Pattern.compile(
-            "CREATE\\s+RULE\\s+[\\w\\s]+ AS[\\s\\S]*?WHERE\\s*\\([^;]*\\);");
+        targetResult = _spliceMatches(
+            targetResult, _CREATE_RULE_PATTERN, sourceStatement, "\n\n");
 
-        Matcher createRulesMatcher = createRulesPattern.matcher(sourceStatement);
+        return targetResult;
+    }
 
-        while (createRulesMatcher.find()) {
+    /**
+     * Inserts every match of {@code pattern} found in {@code sourceStatement}
+     * into {@code targetResult} immediately before the dump-complete marker,
+     * separated by {@code separator}.
+     */
+    private String _spliceMatches(
+        String targetResult, Pattern pattern, String sourceStatement,
+        String separator) {
+
+        Matcher matcher = pattern.matcher(sourceStatement);
+
+        while (matcher.find()) {
             targetResult = targetResult.replace(
-                delimiter, createRulesMatcher.group() + "\n\n" + delimiter
-            );
+                DUMP_COMPLETE_DELIMITER,
+                matcher.group() + separator + DUMP_COMPLETE_DELIMITER);
         }
 
         return targetResult;
     }
+
+    private static final Pattern _ALTER_TABLE_ONLY_PATTERN = Pattern.compile(
+        "ALTER TABLE ONLY\\s+public\\.(?!\\w+_x_\\d+)\\w+\\s+" +
+            "ADD CONSTRAINT\\s+.*?PRIMARY KEY\\s*\\(.*?\\);\n");
+
+    private static final Pattern _CONTEXT_PATTERN = Pattern.compile(
+        "CREATE\\s+TABLE\\s+(?:public\\.)?([a-zA-Z_0-9]+)\\s*" +
+            "\\(([^)]*?(\\([^)]*\\)[^)]*?)*)\\);",
+        Pattern.DOTALL);
+
+    private static final Pattern _CREATE_RULE_PATTERN = Pattern.compile(
+        "CREATE\\s+RULE\\s+[\\w\\s]+ AS[\\s\\S]*?WHERE\\s*\\([^;]*\\);");
+
+    private static final Pattern _INDEX_PATTERN = Pattern.compile(
+        "CREATE\\s+INDEX\\s+(\\w+)\\s+ON\\s+public\\.(\\w+.*);");
+
+    private static final Pattern _UNIQUE_INDEX_PATTERN = Pattern.compile(
+        "CREATE\\s+UNIQUE\\s+INDEX\\s+(\\w+)\\s+ON\\s+public\\.(\\w+.*);");
 
 }
