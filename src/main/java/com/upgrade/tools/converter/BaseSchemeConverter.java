@@ -12,6 +12,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,32 +60,29 @@ public abstract class BaseSchemeConverter
             List<String> indexNames)
         throws ConverterException {
 
+        Print.info(
+            "Starting scheme converter to %s database".formatted(
+                getDatabaseType()));
+
+        Map<String, String> contentsMap = _readFiles(
+            path, sourceName, targetName);
+
+        String sourceContent = contentsMap.get("source.content");
+        String targetContent = contentsMap.get("target.content");
+
+        String converted = _converterContextPattern(
+            sourceContent, targetContent, getContextPattern(), indexNames);
+
+        String processed = postProcess(converted, sourceContent, indexNames);
+
         try {
-            Print.info(
-                "Starting scheme converter to %s database".formatted(
-                    getDatabaseType()));
-
-            Map<String, String> contentsMap = _readFiles(
-                path, sourceName, targetName);
-
-            String sourceContent = contentsMap.get(
-                "source.content");
-
-            String targetContent = contentsMap.get(
-                "target.content");
-
-            _writerResult(
-                postProcess(
-                    _converterContextPattern(
-                        sourceContent, targetContent,
-                        getContextPattern(), indexNames),
-                    sourceContent, indexNames),
-                path, newName);
+            _writerResult(processed, path, newName);
         }
-        catch (Exception exception) {
-            throw new ConverterException(exception);
+        catch (IOException ioException) {
+            throw new ConverterException(
+                "Unable to write SQL output file at " + path + newName,
+                ioException);
         }
-
     }
 
     private String _concat(String value, int index, int size) {
@@ -262,53 +260,52 @@ public abstract class BaseSchemeConverter
         return newColumns;
     }
 
-    private Map<String, String> _readContentMap(
-        InputStream source, InputStream target) throws IOException {
+    private Map<String, String> _readFiles(
+            String path, String sourceName, String targetName)
+        throws ConverterException {
+
+        if (!sourceName.endsWith(_VALID_EXTENSION) ||
+            !targetName.endsWith(_VALID_EXTENSION)) {
+
+            throw new ConverterException(
+                "File extension must end with " + _VALID_EXTENSION +
+                    " (got source=" + sourceName +
+                    ", target=" + targetName + ")");
+        }
 
         Map<String, String> contentMap = new HashMap<>();
 
         contentMap.put(
-            "source.content",
-            SchemeConverterUtil.readContent(source));
-
+            "source.content", _readSqlFile(path + sourceName, "source"));
         contentMap.put(
-            "target.content",
-            SchemeConverterUtil.readContent(target));
+            "target.content", _readSqlFile(path + targetName, "target"));
 
         return contentMap;
     }
 
-    private Map<String, String> _readFiles(
-            String path, String sourceName, String targetName)
-        throws Exception {
+    private String _readSqlFile(String fullPath, String role)
+        throws ConverterException {
 
-        try {
-            if (!sourceName.endsWith(_VALID_EXTENSION) ||
-                !targetName.endsWith(_VALID_EXTENSION)) {
+        File file = new File(fullPath);
 
-                throw new Exception(
-                    "File extension must ends with " + _VALID_EXTENSION);
-            }
-
-            InputStream sourceInputStream = new FileInputStream(
-                path + sourceName);
-
-            InputStream targetInputStream = new FileInputStream(
-                path + targetName);
-
-            if (sourceInputStream.read() <= 0 ||
-                targetInputStream.read() <= 0) {
-
-                throw new Exception("File content cannot be empty");
-            }
-
-            return _readContentMap(
-                sourceInputStream, targetInputStream);
-        }
-        catch (Exception exception) {
-            throw new Exception(exception);
+        if (!file.exists() || !file.isFile()) {
+            throw new ConverterException(
+                "The " + role + " file does not exist: " + fullPath);
         }
 
+        if (file.length() == 0) {
+            throw new ConverterException(
+                "The " + role + " file is empty: " + fullPath);
+        }
+
+        try (InputStream inputStream = new FileInputStream(file)) {
+            return SchemeConverterUtil.readContent(inputStream);
+        }
+        catch (IOException ioException) {
+            throw new ConverterException(
+                "Unable to read " + role + " file: " + fullPath,
+                ioException);
+        }
     }
 
     private void _writerResult(
@@ -317,14 +314,12 @@ public abstract class BaseSchemeConverter
 
         File file = new File(path + newName);
 
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+        try (BufferedWriter writer = new BufferedWriter(
+                new FileWriter(file, StandardCharsets.UTF_8))) {
+
             writer.write(content);
 
             ResultsThreadLocal.setResultsThreadLocal(true);
-        }
-        catch (IOException ioException) {
-            throw new IOException(
-                "Unable to create SQL output file" + ioException.getCause());
         }
     }
 
