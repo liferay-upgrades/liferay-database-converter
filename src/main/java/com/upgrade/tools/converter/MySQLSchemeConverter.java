@@ -25,7 +25,8 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
                 targetResult, sourceStatement, parameters);
         }
         catch (Exception exception) {
-            throw new ConverterException(exception);
+            throw new ConverterException(
+                "MySQL constraint replacement failed", exception);
         }
     }
 
@@ -46,11 +47,11 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
         throws ConverterException {
 
         try {
-            return _replaceStatements(
-                targetResult, sourceContent);
+            return _replaceStatements(targetResult, sourceContent);
         }
         catch (Exception exception) {
-            throw new ConverterException(exception);
+            throw new ConverterException(
+                "MySQL post-processing failed", exception);
         }
     }
 
@@ -65,12 +66,9 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
 
             while (tableStatementMatcher.find()) {
                 String tableNameNormalized =
-                    tableStatementMatcher.group(1).replace(
-                        "`", "");
+                    tableStatementMatcher.group(1).replace("`", "");
 
-                if (tableNameNormalized.equalsIgnoreCase(
-                        matcher.group(1))) {
-
+                if (tableNameNormalized.equalsIgnoreCase(matcher.group(1))) {
                     statement = statement.replace(
                         matcher.group(1), tableNameNormalized);
                 }
@@ -82,33 +80,24 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
 
     private String _replaceStatements(String statement, String sourceStatement) {
         statement = _processReplacement(
-            statement,
-            Pattern.compile("DROP\\s+TABLE\\s+IF\\s+EXISTS\\s+`?([^`\\s]+)`?;"),
-            sourceStatement);
+            statement, _DROP_TABLE_PATTERN, sourceStatement);
 
         statement = _processReplacement(
-            statement,
-            Pattern.compile("LOCK\\s+TABLES\\s+`?([^`\\s]+)`?\\s+WRITE;"),
-            sourceStatement);
+            statement, _LOCK_TABLES_PATTERN, sourceStatement);
 
         return _processReplacement(
-             statement,
-             Pattern.compile("ALTER\\s+TABLE\\s+`?([^`\\s]+)`?"),
-             sourceStatement);
+            statement, _ALTER_TABLE_PATTERN, sourceStatement);
     }
 
     private String _replacementConstraints(
         String columns, String constraints, List<String> keysName) {
 
-        Pattern pattern = Pattern.compile("PRIMARY\\s+KEY\\s+(.+)(\\s*.*)+");
-
-        Matcher matcher = pattern.matcher(constraints);
+        Matcher matcher = _PRIMARY_KEY_PATTERN.matcher(constraints);
 
         StringBuilder sb = new StringBuilder();
 
         if (matcher.find()) {
-            String trimmedColumns = columns.replaceAll(
-                ",?\\s*\\)\\s*$", "");
+            String trimmedColumns = columns.replaceAll(",?\\s*\\)\\s*$", "");
 
             sb.append(trimmedColumns);
             sb.append(",\n  ");
@@ -148,7 +137,19 @@ public class MySQLSchemeConverter extends BaseSchemeConverter {
         return String.join(",\n  ", kept);
     }
 
-    private final Pattern _TABLE_NAME_PATTERN = Pattern.compile(
+    private static final Pattern _ALTER_TABLE_PATTERN = Pattern.compile(
+        "ALTER\\s+TABLE\\s+`?([^`\\s]+)`?");
+
+    private static final Pattern _DROP_TABLE_PATTERN = Pattern.compile(
+        "DROP\\s+TABLE\\s+IF\\s+EXISTS\\s+`?([^`\\s]+)`?;");
+
+    private static final Pattern _LOCK_TABLES_PATTERN = Pattern.compile(
+        "LOCK\\s+TABLES\\s+`?([^`\\s]+)`?\\s+WRITE;");
+
+    private static final Pattern _PRIMARY_KEY_PATTERN = Pattern.compile(
+        "PRIMARY\\s+KEY\\s+(.+)(\\s*.*)+");
+
+    private static final Pattern _TABLE_NAME_PATTERN = Pattern.compile(
         "CREATE\\s+TABLE\\s+(`[^`]+`)\\s*\\(([\\s\\S]*?\\)\\s*)(?=ENGINE|;)");
 
 }
