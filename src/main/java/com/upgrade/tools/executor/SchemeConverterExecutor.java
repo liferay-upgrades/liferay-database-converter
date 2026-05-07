@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Scanner;
+import java.util.Set;
 
 /**
  * @author Albert Gomes Cabral
@@ -77,41 +78,65 @@ public class SchemeConverterExecutor {
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
 
+            String value = _requireValue(args, i, arg);
+
             switch (arg) {
                 case "--database-type":
                 case "-d":
-                    params.databaseType = args[i + 1];
+                    params.databaseType = value;
+                    i++;
                     break;
                 case "--path":
                 case "-p":
-                    params.path = args[i + 1];
+                    params.path = value;
+                    i++;
                     break;
                 case "--source-file":
                 case "-sf":
-                    params.sourceFileName = args[i + 1];
+                    params.sourceFileName = value;
+                    i++;
                     break;
                 case "--target-file":
                 case "-tf":
-                    params.targetFileName = args[i + 1];
+                    params.targetFileName = value;
                     i++;
                     break;
                 case "--new-file":
                 case "-nf":
-                    params.newFileName = args[i + 1];
+                    params.newFileName = value;
+                    i++;
                     break;
                 case "--index-name":
                 case "-in":
-                    String indexes = args[i + 1];
+                    Collections.addAll(
+                        params.indexesName, value.split(","));
 
-                    String[] indexNameScratchSplit = indexes.split(",");
-
-                    Collections.addAll(params.indexesName, indexNameScratchSplit);
-
+                    i++;
                     break;
             }
         }
 
         return params;
+    }
+
+    /**
+     * Returns the value following flag {@code arg} at index {@code i}, or
+     * {@code null} if {@code arg} is itself not a recognized flag (the
+     * switch will simply skip it). Throws when a recognized flag has no
+     * following value, instead of letting an ArrayIndexOutOfBoundsException
+     * leak out.
+     */
+    private static String _requireValue(String[] args, int i, String arg) {
+        if (!_FLAGS_WITH_VALUES.contains(arg)) {
+            return null;
+        }
+
+        if (i + 1 >= args.length) {
+            throw new IllegalArgumentException(
+                "Missing value for flag " + arg);
+        }
+
+        return args[i + 1];
     }
 
     private static String _helper() {
@@ -328,6 +353,14 @@ public class SchemeConverterExecutor {
             return input;
         }
     }
+
+    private static final Set<String> _FLAGS_WITH_VALUES = Set.of(
+        "--database-type", "-d",
+        "--path", "-p",
+        "--source-file", "-sf",
+        "--target-file", "-tf",
+        "--new-file", "-nf",
+        "--index-name", "-in");
 
     private static class Params {
         public String databaseType;
